@@ -13,8 +13,8 @@
 #include "WiFi.h"
 
 //-------------------- WIFI CONFIG --------------------
-const char *ssid = "Lâm Lan";
-const char *password = "minhngoc";
+const char *ssid = "Lâm Hoàng";
+const char *password = "12345678";
 const char *auth = "hCpwgjaK9BpOqJLTyBL5rE1jstp7dF9t";
 BlynkTimer blynk_timer;
 // -------------------- OLED CONFIG --------------------
@@ -86,8 +86,14 @@ void Display_Time()
 }
 
 // -------------------- DISPLAY ATTRIBUTE --------------------
+typedef enum
+{
+  GOOD,
+  AVERAGE,
+  POOR
+} SleepRank;
 int score = 0;
-String rank;
+SleepRank rank;
 int hr = 0;
 double SpO2_Sum = 0.0f;
 uint32_t SpO2_Count = 0;
@@ -162,34 +168,24 @@ void Display_Process()
 }
 
 // -------------------- BUTTON PROCESS --------------------
-#define BUTTON_DEBOUNCE_DELAY 15
+#define BUTTON_DEBOUNCE_DELAY 10
 const int buttonPin = 4;
-bool buttonState = HIGH;
-bool lastButtonState = HIGH;
-unsigned long lastDebounceTime = 0;
-void Button_Process()
-{
-  bool reading = digitalRead(buttonPin);
 
-  if (reading != lastButtonState)
-    lastDebounceTime = millis();
-
-  if ((millis() - lastDebounceTime) > BUTTON_DEBOUNCE_DELAY)
-  {
-    if (reading != buttonState)
-    {
-      buttonState = reading;
-      if (buttonState == LOW)
-      {
-        currentMode = (currentMode == TIME) ? ATTRIBUTE : TIME;
-        Serial.println("Button Pressed");
-      }
-    }
+void IRAM_ATTR handleButtonPress(){
+  delay(BUTTON_DEBOUNCE_DELAY); // Debounce delay
+  if(digitalRead(buttonPin) == LOW){
+    currentMode = (currentMode == TIME) ? ATTRIBUTE : TIME;
+    Serial.println("Button Pressed");
   }
-  lastButtonState = reading;
 }
 
 // -------------------- BLYNK SENDERS --------------------
+const char* Message_SleepRank_Good = "Chúc mừng bạn có giấc ngủ tuyệt vời";
+const char* Message_SleepRank_Average = "Giấc ngủ của bạn khá tốt";
+const char* Message_SleepRank_Poor = "Bạn nên chú ý giấc ngủ nhiều hơn";
+const char* Message_SpO2_Good = "Oxy trung bình đêm qua tốt. Phòng ngủ thông thoáng";
+const char* Message_SpO2_Average = "Oxy trung bình khá tốt, phòng ngủ hơi bí";
+const char* Message_SpO2_Bad = "Oxy trung bình thấp. Phòng ngủ thiếu thông thoáng nên cải thiện ngay";
 void Blynk_SendData(void){
   Blynk.virtualWrite(V0, hr);
   Blynk.virtualWrite(V5, SpO2_Avg);
@@ -198,13 +194,16 @@ void Blynk_SendData(void){
   Blynk.virtualWrite(V3, fmtTime(sleepREMTime));
   Blynk.virtualWrite(V4, fmtTime(awakeTime));
   Blynk.virtualWrite(V6, score);
-  Blynk.virtualWrite(V7, rank);
+  Blynk.virtualWrite(V7, (rank) == GOOD ? Message_SleepRank_Good : (rank) == AVERAGE ? Message_SleepRank_Average : Message_SleepRank_Poor);
+  Blynk.virtualWrite(V8, (SpO2_Avg > 95.0f) ? Message_SpO2_Good : (SpO2_Avg >= 93.0f && SpO2_Avg <= 95.0f) ? Message_SpO2_Average : Message_SpO2_Bad);
+  Serial.println("Data sent to Blynk");
 }
 
 void setup()
 {
   Serial.begin(115200);
   pinMode(buttonPin, INPUT_PULLUP);
+  attachInterrupt(digitalPinToInterrupt(buttonPin), handleButtonPress, FALLING);
   
   Blynk.begin(auth, ssid, password);
   while(!Blynk.connected()){
@@ -213,7 +212,7 @@ void setup()
     Blynk.connect();
   }
   Serial.println("Blynk Connected!");
-  blynk_timer.setInterval(500L, Blynk_SendData);
+  //blynk_timer.setInterval(500L, Blynk_SendData);
 
   Wire.begin(9, 8);
 
@@ -253,7 +252,7 @@ void setup()
   mpu.setAccelerometerRange(MPU6050_RANGE_8_G);
   mpu.setFilterBandwidth(MPU6050_BAND_21_HZ);
   Serial.println("MPU6050 khoi dong thanh cong!");
-  delay(1000);
+  delay(200);
   // Thoi gian
   configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
 
@@ -265,8 +264,8 @@ void loop()
 {
   unsigned long currentMillis = millis();
   Blynk.run();
-  blynk_timer.run();
-  Button_Process();
+  // blynk_timer.run();
+  //Button_Process();
   // ===== ĐỌC CẢM BIẾN MPU6050 =====
   sensors_event_t accel, gyro, temp;
   mpu.getEvent(&accel, &gyro, &temp);
@@ -456,10 +455,12 @@ void loop()
     else if (awakePercent < 20)
       score += 1;
 
-    rank = (score >= 8) ? "TOT" : (score >= 5) ? "TRUNG BINH"
-                                               : "KEM";
-    Serial.printf("📊 Diem ngu: %d/10 (%s)\n", score, rank.c_str());
+    rank = (score >= 8) ? GOOD : (score >= 5) ? AVERAGE
+                                               : POOR;
+    Serial.printf("📊 Diem ngu: %d/10 (%s)\n", score, (rank) == GOOD ? "TOT" : (rank) == AVERAGE ? "TB"
+                                                                                 : "YEU");
   }
   Display_Process();
-  delay(1000 - (millis() - currentMillis));
+  Blynk_SendData();
+  delay(1);
 }

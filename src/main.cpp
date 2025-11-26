@@ -61,12 +61,14 @@ const int remHR = 80;
 const int Nong = 65;
 const int Nong2 = 51;
 
-// -------------------- DISPLAY TIME --------------------
+// -------------------- DISPLAY TAB1 --------------------
 const char *ntpServer = "time.google.com";
 const long gmtOffset_sec = 7 * 3600; // GMT+7
 const int daylightOffset_sec = 0;
 char buffer_time[9];
 char buffer_date[20];
+int hr = 0;
+uint8_t spo2 = 0;
 void Display_Time()
 {
   struct tm timeinfo;
@@ -80,9 +82,15 @@ void Display_Time()
   display.setCursor(0, 5);
   display.setTextSize(2);
   display.printf(buffer_time);
-  display.setCursor(0, 40);
+  display.setCursor(0, 29);
   display.setTextSize(1);
   display.print(buffer_date);
+  display.setCursor(0, 41);
+  display.print("HR: ");
+  display.print(hr);
+  display.setCursor(0, 53);
+  display.print("SpO2: ");
+  display.print(spo2);
 }
 
 // -------------------- DISPLAY ATTRIBUTE --------------------
@@ -94,8 +102,10 @@ typedef enum
 } SleepRank;
 int score = 0;
 SleepRank rank;
-int hr = 0;
-double SpO2_Sum = 0.0f;
+double hr_sum = 0.0l;
+float hr_avg = 0.0f;
+unsigned long long hr_time_count = 0;
+double SpO2_Sum = 0.0l;
 uint32_t SpO2_Count = 0;
 float SpO2_Avg = 0.0f;
 
@@ -116,13 +126,13 @@ void Display_Attribute()
   int start_y = 12;
 
   display.setCursor(0, start_y + 0);
-  display.print("HR: ");
-  display.print(hr);
+  display.print("HR_Avg: ");
+  display.print((hr_avg  >= 60 && hr_avg <= 75) ? "Tot" : (hr_avg > 75 && hr_avg <= 80) ? "Hoi cao" : "Cao");
   display.println(" bpm");
 
   display.setCursor(0, start_y + 12);
-  display.print("Avr SpO2: ");
-  display.print(SpO2_Avg, 1);
+  display.print("SpO2_Avg: ");
+  display.print((SpO2_Avg > 94.0f) ? "Tot" : (SpO2_Avg >= 93.0f && SpO2_Avg <= 94.0f) ? "Hoi thap" : "Thap");
 
   display.setCursor(0, start_y + 24);
   display.print("Trang thai: ");
@@ -184,10 +194,13 @@ const char* Message_SleepRank_Good = "Chúc mừng bạn có giấc ngủ tuyệ
 const char* Message_SleepRank_Average = "Giấc ngủ của bạn khá tốt";
 const char* Message_SleepRank_Poor = "Bạn nên chú ý giấc ngủ nhiều hơn";
 const char* Message_SpO2_Good = "Oxy trung bình đêm qua tốt. Phòng ngủ thông thoáng";
-const char* Message_SpO2_Average = "Oxy trung bình khá tốt, phòng ngủ hơi bí";
-const char* Message_SpO2_Bad = "Oxy trung bình thấp. Phòng ngủ thiếu thông thoáng nên cải thiện ngay";
+const char* Message_SpO2_Average = "Oxy trung bình khá tốt, phòng ngủ hơi bí - nên mở cửa hoặc bật quạt";
+const char* Message_SpO2_Bad = "Oxy trung bình thấp, môi trường phòng ngủ thiếu thông thoáng - cần cải thiện ngay";
+const char* Message_HR_Good = "Nhịp tim trung bình ổn định, giấc ngủ bình thường";
+const char* Message_HR_Average = "Nhịp tim trung bình hơi cao, có thể do căng thẳng hoặc ngủ chưa sâu";
+const char* Message_HR_Bad = "Nhịp tim trung bình cao, giấc ngủ kém - cần nghỉ ngơi và thư giãn nhiều hơn";
 void Blynk_SendData(void){
-  Blynk.virtualWrite(V0, hr);
+  Blynk.virtualWrite(V0, hr_avg);
   Blynk.virtualWrite(V5, SpO2_Avg);
   Blynk.virtualWrite(V1, fmtTime(sleepNongTime));
   Blynk.virtualWrite(V2, fmtTime(sleepSauTime));
@@ -196,6 +209,7 @@ void Blynk_SendData(void){
   Blynk.virtualWrite(V6, score);
   Blynk.virtualWrite(V7, (rank) == GOOD ? Message_SleepRank_Good : (rank) == AVERAGE ? Message_SleepRank_Average : Message_SleepRank_Poor);
   Blynk.virtualWrite(V8, (SpO2_Avg > 95.0f) ? Message_SpO2_Good : (SpO2_Avg >= 93.0f && SpO2_Avg <= 95.0f) ? Message_SpO2_Average : Message_SpO2_Bad);
+  Blynk.virtualWrite(V9, (hr_avg >= 60 && hr_avg <= 75) ? Message_HR_Good : (hr_avg > 75 && hr_avg <= 80) ? Message_HR_Average : Message_HR_Bad);
   Serial.println("Data sent to Blynk");
 }
 
@@ -274,9 +288,12 @@ void loop()
   lastAccMagnitude = accMagnitude;
 
   hr = pox.getHeartRate();
-  if (hr)
+  if (hr && (sleepingNong || deepSleep || remSleep))
   {
-    float spo2 = pox.getSpO2();
+    hr_sum += hr;
+    hr_time_count ++;
+    hr_avg = hr_sum / hr_time_count;
+    spo2 = pox.getSpO2();
     SpO2_Sum += spo2;
     SpO2_Count++;
     SpO2_Avg = SpO2_Sum / SpO2_Count;

@@ -212,9 +212,8 @@ void setup()
     Blynk.connect();
   }
   Serial.println("Blynk Connected!");
-  //blynk_timer.setInterval(500L, Blynk_SendData);
 
-  Wire.begin(9, 8);
+  Wire.begin(6, 7); // SDA = GPIO 6, SCL = GPIO 7
 
   // OLED
   if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C))
@@ -264,8 +263,6 @@ void loop()
 {
   unsigned long currentMillis = millis();
   Blynk.run();
-  // blynk_timer.run();
-  //Button_Process();
   // ===== ĐỌC CẢM BIẾN MPU6050 =====
   sensors_event_t accel, gyro, temp;
   mpu.getEvent(&accel, &gyro, &temp);

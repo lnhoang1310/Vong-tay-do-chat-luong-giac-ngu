@@ -157,7 +157,8 @@ void Display_Attribute()
 typedef enum
 {
   TIME,
-  ATTRIBUTE
+  ATTRIBUTE,
+  DISPLAY_OFF
 } DisplayMode;
 
 DisplayMode currentMode = TIME;
@@ -172,6 +173,9 @@ void Display_Process()
     break;
   case ATTRIBUTE:
     Display_Attribute();
+    break;
+  case DISPLAY_OFF:
+    display.ssd1306_command(SSD1306_DISPLAYOFF);
     break;
   }
   display.display();
@@ -316,6 +320,7 @@ void loop()
       isStill = true;
       if (currentMillis - stillStartTime >= stillThreshold && hr >= Nong2 && hr <= Nong)
       {
+        currentMode = DISPLAY_OFF;
         sleepingNong = true;
         movementStartTime = 0;
         sleepNongTime = 0;

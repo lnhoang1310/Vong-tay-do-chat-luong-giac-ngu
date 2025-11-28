@@ -184,10 +184,12 @@ void Display_Process()
 // -------------------- BUTTON PROCESS --------------------
 #define BUTTON_DEBOUNCE_DELAY 10
 const int buttonPin = 4;
+volatile uint32_t start_time_have_action = 0;
 
 void IRAM_ATTR handleButtonPress(){
   delay(BUTTON_DEBOUNCE_DELAY); // Debounce delay
   if(digitalRead(buttonPin) == LOW){
+    start_time_have_action = millis();
     currentMode = (currentMode == TIME) ? ATTRIBUTE : TIME;
     Serial.println("Button Pressed");
   }
@@ -280,6 +282,9 @@ void setup()
 void loop()
 {
   unsigned long currentMillis = millis();
+  if(currentMillis - start_time_have_action >= 20000){
+    currentMode = DISPLAY_OFF;
+  }
   Blynk.run();
   // ===== ĐỌC CẢM BIẾN MPU6050 =====
   sensors_event_t accel, gyro, temp;
@@ -320,7 +325,6 @@ void loop()
       isStill = true;
       if (currentMillis - stillStartTime >= stillThreshold && hr >= Nong2 && hr <= Nong)
       {
-        currentMode = DISPLAY_OFF;
         sleepingNong = true;
         movementStartTime = 0;
         sleepNongTime = 0;

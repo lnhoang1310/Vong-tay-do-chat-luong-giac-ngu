@@ -14,11 +14,11 @@
 
 //-------------------- WIFI CONFIG --------------------
 const char *ssid = "Lâm Hoàng";
-const char *password = "12345678";
+const char *password = "123456789";
 const char *auth = "hCpwgjaK9BpOqJLTyBL5rE1jstp7dF9t";
 BlynkTimer blynk_timer;
 // -------------------- OLED CONFIG --------------------
-#define SCREEN_WIDTH 128 
+#define SCREEN_WIDTH 128
 #define SCREEN_HEIGHT 64
 #define OLED_RESET -1
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
@@ -127,12 +127,14 @@ void Display_Attribute()
 
   display.setCursor(0, start_y + 0);
   display.print("HR_Avg: ");
-  display.print((hr_avg  >= 60 && hr_avg <= 75) ? "Tot" : (hr_avg > 75 && hr_avg <= 80) ? "Hoi cao" : "Cao");
+  display.print((hr_avg >= 60 && hr_avg <= 75) ? "Tot" : (hr_avg > 75 && hr_avg <= 80) ? "Hoi cao"
+                                                                                       : "Cao");
   display.println(" bpm");
 
   display.setCursor(0, start_y + 12);
   display.print("SpO2_Avg: ");
-  display.print((SpO2_Avg > 94.0f) ? "Tot" : (SpO2_Avg >= 93.0f && SpO2_Avg <= 94.0f) ? "Hoi thap" : "Thap");
+  display.print((SpO2_Avg > 94.0f) ? "Tot" : (SpO2_Avg >= 93.0f && SpO2_Avg <= 94.0f) ? "Hoi thap"
+                                                                                      : "Thap");
 
   display.setCursor(0, start_y + 24);
   display.print("Trang thai: ");
@@ -178,6 +180,10 @@ void Display_Process()
     display.ssd1306_command(SSD1306_DISPLAYOFF);
     break;
   }
+  if (currentMode != DISPLAY_OFF)
+    display.ssd1306_command(SSD1306_DISPLAYON);
+    Serial.println((currentMode == TIME) ? "Display TIME" : (currentMode == ATTRIBUTE) ? "Display ATTRIBUTE"
+                                                                                       : "Display OFF");
   display.display();
 }
 
@@ -186,26 +192,26 @@ void Display_Process()
 const int buttonPin = 4;
 volatile uint32_t start_time_have_action = 0;
 
-void IRAM_ATTR handleButtonPress(){
-  delay(BUTTON_DEBOUNCE_DELAY); // Debounce delay
-  if(digitalRead(buttonPin) == LOW){
-    start_time_have_action = millis();
-    currentMode = (currentMode == TIME) ? ATTRIBUTE : TIME;
-    Serial.println("Button Pressed");
-  }
+volatile bool rawPressed = false;
+bool buttonFlag = false;
+unsigned long lastDebounceTime = 0;
+void IRAM_ATTR handleButtonPress()
+{
+  rawPressed = true; // chỉ đánh dấu
 }
 
 // -------------------- BLYNK SENDERS --------------------
-const char* Message_SleepRank_Good = "Chúc mừng bạn có giấc ngủ tuyệt vời";
-const char* Message_SleepRank_Average = "Giấc ngủ của bạn khá tốt";
-const char* Message_SleepRank_Poor = "Bạn nên chú ý giấc ngủ nhiều hơn";
-const char* Message_SpO2_Good = "Oxy trung bình đêm qua tốt. Phòng ngủ thông thoáng";
-const char* Message_SpO2_Average = "Oxy trung bình khá tốt, phòng ngủ hơi bí - nên mở cửa hoặc bật quạt";
-const char* Message_SpO2_Bad = "Oxy trung bình thấp, môi trường phòng ngủ thiếu thông thoáng - cần cải thiện ngay";
-const char* Message_HR_Good = "Nhịp tim trung bình ổn định, giấc ngủ bình thường";
-const char* Message_HR_Average = "Nhịp tim trung bình hơi cao, có thể do căng thẳng hoặc ngủ chưa sâu";
-const char* Message_HR_Bad = "Nhịp tim trung bình cao, giấc ngủ kém - cần nghỉ ngơi và thư giãn nhiều hơn";
-void Blynk_SendData(void){
+const char *Message_SleepRank_Good = "Chúc mừng bạn có giấc ngủ tuyệt vời";
+const char *Message_SleepRank_Average = "Giấc ngủ của bạn khá tốt";
+const char *Message_SleepRank_Poor = "Bạn nên chú ý giấc ngủ nhiều hơn";
+const char *Message_SpO2_Good = "Oxy trung bình đêm qua tốt. Phòng ngủ thông thoáng";
+const char *Message_SpO2_Average = "Oxy trung bình khá tốt, phòng ngủ hơi bí - nên mở cửa hoặc bật quạt";
+const char *Message_SpO2_Bad = "Oxy trung bình thấp, môi trường phòng ngủ thiếu thông thoáng - cần cải thiện ngay";
+const char *Message_HR_Good = "Nhịp tim trung bình ổn định, giấc ngủ bình thường";
+const char *Message_HR_Average = "Nhịp tim trung bình hơi cao, có thể do căng thẳng hoặc ngủ chưa sâu";
+const char *Message_HR_Bad = "Nhịp tim trung bình cao, giấc ngủ kém - cần nghỉ ngơi và thư giãn nhiều hơn";
+void Blynk_SendData(void)
+{
   Blynk.virtualWrite(V0, hr_avg);
   Blynk.virtualWrite(V5, SpO2_Avg);
   Blynk.virtualWrite(V1, fmtTime(sleepNongTime));
@@ -213,9 +219,12 @@ void Blynk_SendData(void){
   Blynk.virtualWrite(V3, fmtTime(sleepREMTime));
   Blynk.virtualWrite(V4, fmtTime(awakeTime));
   Blynk.virtualWrite(V6, score);
-  Blynk.virtualWrite(V7, (rank) == GOOD ? Message_SleepRank_Good : (rank) == AVERAGE ? Message_SleepRank_Average : Message_SleepRank_Poor);
-  Blynk.virtualWrite(V8, (SpO2_Avg > 95.0f) ? Message_SpO2_Good : (SpO2_Avg >= 93.0f && SpO2_Avg <= 95.0f) ? Message_SpO2_Average : Message_SpO2_Bad);
-  Blynk.virtualWrite(V9, (hr_avg >= 60 && hr_avg <= 75) ? Message_HR_Good : (hr_avg > 75 && hr_avg <= 80) ? Message_HR_Average : Message_HR_Bad);
+  Blynk.virtualWrite(V7, (rank) == GOOD ? Message_SleepRank_Good : (rank) == AVERAGE ? Message_SleepRank_Average
+                                                                                     : Message_SleepRank_Poor);
+  Blynk.virtualWrite(V8, (SpO2_Avg > 95.0f) ? Message_SpO2_Good : (SpO2_Avg >= 93.0f && SpO2_Avg <= 95.0f) ? Message_SpO2_Average
+                                                                                                           : Message_SpO2_Bad);
+  Blynk.virtualWrite(V9, (hr_avg >= 60 && hr_avg <= 75) ? Message_HR_Good : (hr_avg > 75 && hr_avg <= 80) ? Message_HR_Average
+                                                                                                          : Message_HR_Bad);
   Serial.println("Data sent to Blynk");
 }
 
@@ -224,13 +233,8 @@ void setup()
   Serial.begin(115200);
   pinMode(buttonPin, INPUT_PULLUP);
   attachInterrupt(digitalPinToInterrupt(buttonPin), handleButtonPress, FALLING);
-  
+
   Blynk.begin(auth, ssid, password);
-  while(!Blynk.connected()){
-    delay(500);
-    Serial.println("Connect Blynk Fail!");
-    Blynk.connect();
-  }
   Serial.println("Blynk Connected!");
 
   Wire.begin(6, 7); // SDA = GPIO 6, SCL = GPIO 7
@@ -282,7 +286,27 @@ void setup()
 void loop()
 {
   unsigned long currentMillis = millis();
-  if(currentMillis - start_time_have_action >= 20000){
+  if (rawPressed)
+  {
+    rawPressed = false; // reset cờ từ ISR
+
+    // nếu lần nhấn mới cách lần trước > 150ms thì coi là hợp lệ
+    if (currentMillis - lastDebounceTime > 50)
+    {
+      buttonFlag = true; // nhấn hợp lệ
+      lastDebounceTime = currentMillis;
+    }
+  }
+
+  if (buttonFlag)
+  {
+    buttonFlag = false;
+    start_time_have_action = currentMillis;
+    currentMode = (currentMode == TIME) ? ATTRIBUTE : TIME;
+    Serial.println("Button pressed!");
+  }
+  if (currentMillis - start_time_have_action >= 20000)
+  {
     currentMode = DISPLAY_OFF;
   }
   Blynk.run();
@@ -300,7 +324,7 @@ void loop()
   if (hr && (sleepingNong || deepSleep || remSleep))
   {
     hr_sum += hr;
-    hr_time_count ++;
+    hr_time_count++;
     hr_avg = hr_sum / hr_time_count;
     spo2 = pox.getSpO2();
     SpO2_Sum += spo2;
@@ -311,7 +335,9 @@ void loop()
       SpO2_Sum = 0.0f;
       SpO2_Count = 0;
     }
-  }else{
+  }
+  else
+  {
     Serial.println("Khong doc duoc HR");
   }
 
@@ -328,7 +354,6 @@ void loop()
         sleepingNong = true;
         movementStartTime = 0;
         sleepNongTime = 0;
-        Serial.println("💤 Bắt đầu NGỦ NÔNG...");
       }
     }
     else
@@ -345,7 +370,6 @@ void loop()
         sleepingNong = false;
         movementStartTime = 0;
         isStill = false;
-        Serial.println("⏰ NGỦ NÔNG kết thúc -> Thức");
       }
     }
     else if (movementStartTime != 0 && currentMillis - movementStartTime > 3000UL)
@@ -357,7 +381,6 @@ void loop()
       sleepingNong = false;
       movementStartTime = 0;
       sleepSauTime = 0;
-      Serial.println("💤 Bắt đầu NGỦ SÂU...");
     }
   }
   else if (deepSleep)
@@ -371,7 +394,6 @@ void loop()
         deepSleep = false;
         movementStartTime = 0;
         isStill = false;
-        Serial.println("⏰ NGỦ SÂU kết thúc -> Thức");
       }
     }
     else if (movementStartTime != 0 && currentMillis - movementStartTime > 3000UL)
@@ -383,7 +405,6 @@ void loop()
       remSleep = true;
       sleepREMTime = 0;
       movementStartTime = 0;
-      Serial.println("🌙 Bắt đầu NGỦ REM...");
     }
   }
   else if (remSleep)
@@ -397,7 +418,6 @@ void loop()
         remSleep = false;
         movementStartTime = 0;
         isStill = false;
-        Serial.println("⏰ NGỦ REM kết thúc -> Thức");
       }
     }
     else if (movementStartTime != 0 && currentMillis - movementStartTime > 3000UL)
@@ -433,17 +453,9 @@ void loop()
   else
     state = (isStill ? "DUNG YEN" : "DI CHUYEN");
 
-  Serial.printf("😴 NguNong: %s | 💤 NguSau: %s | 🌙 NguREM: %s | ⏱ Thuc: %s | %s\n",
-                fmtTime(sleepNongTime).c_str(),
-                fmtTime(sleepSauTime).c_str(),
-                fmtTime(sleepREMTime).c_str(),
-                fmtTime(awakeTime).c_str(),
-                state.c_str());
-
   if ((sleepingNong || deepSleep || remSleep) && movementStartTime != 0)
   {
     unsigned long movingTime = currentMillis - movementStartTime;
-    Serial.printf("⏱ Di chuyen lien tuc: %lu s\n", movingTime / 1000);
   }
 
   // ===== TÍNH & IN ĐIỂM GIẤC NGỦ =====
@@ -479,11 +491,9 @@ void loop()
       score += 1;
 
     rank = (score >= 8) ? GOOD : (score >= 5) ? AVERAGE
-                                               : POOR;
-    Serial.printf("📊 Diem ngu: %d/10 (%s)\n", score, (rank) == GOOD ? "TOT" : (rank) == AVERAGE ? "TB"
-                                                                                 : "YEU");
+                                              : POOR;
   }
   Display_Process();
   Blynk_SendData();
-  delay(1);
+  delay(100);
 }

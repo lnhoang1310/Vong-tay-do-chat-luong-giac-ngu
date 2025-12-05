@@ -182,8 +182,8 @@ void Display_Process()
   }
   if (currentMode != DISPLAY_OFF)
     display.ssd1306_command(SSD1306_DISPLAYON);
-    Serial.println((currentMode == TIME) ? "Display TIME" : (currentMode == ATTRIBUTE) ? "Display ATTRIBUTE"
-                                                                                       : "Display OFF");
+  Serial.println((currentMode == TIME) ? "Display TIME" : (currentMode == ATTRIBUTE) ? "Display ATTRIBUTE"
+                                                                                     : "Display OFF");
   display.display();
 }
 
@@ -321,12 +321,12 @@ void loop()
   lastAccMagnitude = accMagnitude;
 
   hr = pox.getHeartRate();
+  spo2 = pox.getSpO2();
   if (hr && (sleepingNong || deepSleep || remSleep))
   {
     hr_sum += hr;
     hr_time_count++;
     hr_avg = hr_sum / hr_time_count;
-    spo2 = pox.getSpO2();
     SpO2_Sum += spo2;
     SpO2_Count++;
     SpO2_Avg = SpO2_Sum / SpO2_Count;
